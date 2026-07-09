@@ -97,25 +97,31 @@ CHECKPOINT_PATH = Path(os.environ.get('MASSFUSION_CHECKPOINT',
 
 
 def _init_earth_engine() -> bool:
-    """Mirrors basin_imagery.py's fetch_ee_composite() auth pattern.
-    Needed for live_features.py's GRACE/Sentinel/MODIS/S1/ERA5 fetches.
-    Returns True if EE is usable."""
+    """Initializes Earth Engine using Streamlit Secrets or local auth."""
     if not HAS_EE_LIB:
         return False
-    key_file = os.environ.get('EE_SERVICE_ACCOUNT_JSON')
+        
     try:
-        if key_file and Path(key_file).exists():
-            with open(key_file) as f:
-                creds = json.load(f)
-            credentials = ee.ServiceAccountCredentials(creds['client_email'], key_file)
-            ee.Initialize(credentials)
+        from google.oauth2.service_account import Credentials
+        
+        # 1. Check if the JSON string is in Streamlit secrets or environment
+        ee_json_str = os.environ.get('EE_SERVICE_ACCOUNT_JSON') or st.secrets.get('EE_SERVICE_ACCOUNT_JSON')
+        
+        if ee_json_str:
+            # Parse the string into a dictionary
+            creds_dict = json.loads(ee_json_str)
+            # Generate credentials from the dictionary
+            credentials = Credentials.from_service_account_info(creds_dict)
+            ee.Initialize(credentials=credentials)
+            return True
         else:
-            ee.Initialize()  # relies on a prior `earthengine authenticate` locally
-        return True
+            # Fallback for local dev if previously authenticated via CLI
+            ee.Initialize()
+            return True
+            
     except Exception as e:
         print(f"DEBUG: Earth Engine init failed: {e}")
         return False
-
 
 HAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
 
