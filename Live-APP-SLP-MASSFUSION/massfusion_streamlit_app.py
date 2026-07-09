@@ -134,7 +134,9 @@ def _init_earth_engine() -> bool:
     except Exception as e:
         # Show the actual error in the Streamlit UI
         st.error(f"🌍 Earth Engine Authentication Error: {str(e)}")
-        return FalseHAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
+        return False
+        
+    HAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
 
 # DEBUG PRINTS
 print("DEBUG: DATA_DIR =", DATA_DIR)
