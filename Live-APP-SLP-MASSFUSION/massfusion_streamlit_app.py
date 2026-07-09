@@ -63,18 +63,13 @@ def _find_data_dir():
     # Normal case for a git-deployed app: data files sit next to the script
     candidates.append(Path(__file__).resolve().parent)
     candidates.append(Path('.').resolve())
-    # Windows local-dev convenience paths -- harmless elsewhere, since
-    # Path('D:/') simply won't exist/match on Linux or macOS
+    # Windows local-dev convenience paths
     candidates += [Path('D:/'), Path('D:/venv'), Path('D:/venv/slp_project')]
     candidates.append(Path.home())
 
     for d in candidates:
         if (d / 'massfusion_meta.json').exists():
             return d
-    # Last resort: the script's own directory, NOT a hardcoded Windows
-    # drive letter. 'D:/' doesn't exist at all on Linux deployments
-    # (Streamlit Community Cloud, Docker, etc.), so mkdir() on it fails
-    # immediately -- that was the actual cause of the FileNotFoundError.
     return Path(__file__).resolve().parent
 
 
@@ -88,10 +83,7 @@ CITY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CITY_FEATURE_CACHE_DIR = DATA_DIR / 'city_feature_cache'
 CITY_FEATURE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Checkpoint location -- override with MASSFUSION_CHECKPOINT env var if it
-# lives somewhere other than next to the data files (e.g. downloaded to a
-# different path at deploy time because of its size, see earlier
-# conversation about checkpoint hosting).
+# Checkpoint location
 CHECKPOINT_PATH = Path(os.environ.get('MASSFUSION_CHECKPOINT',
                                        DATA_DIR / 'v_doom7_soup_weighted.pt'))
 
@@ -135,8 +127,9 @@ def _init_earth_engine() -> bool:
         # Show the actual error in the Streamlit UI
         st.error(f"🌍 Earth Engine Authentication Error: {str(e)}")
         return False
-        
-    HAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
+
+
+HAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
 
 # DEBUG PRINTS
 print("DEBUG: DATA_DIR =", DATA_DIR)
@@ -183,12 +176,7 @@ MODEL_INFO = META['model']
 
 @st.cache_resource(show_spinner='🧠 Loading V_DOOM7 checkpoint…')
 def load_live_model():
-    """Loads the real model ONCE per app process (st.cache_resource, not
-    cache_data -- this holds a torch.nn.Module + EE/CMEMS sessions, not
-    picklable data). Returns None if anything required is missing, so
-    callers can fall back to cached/physics predictions gracefully
-    instead of crashing the whole app.
-    """
+    """Loads the real model ONCE per app process."""
     if not HAS_LIVE_MODEL:
         print("DEBUG: v_doom7_inference not importable -- live model disabled")
         return None
@@ -198,12 +186,10 @@ def load_live_model():
 
     ee_ok = _init_earth_engine()
     if not ee_ok:
-        print("DEBUG: Earth Engine not available -- live model disabled "
-              "(GRACE/Sentinel/MODIS/S1/ERA5 fetches need it)")
+        print("DEBUG: Earth Engine not available -- live model disabled")
         return None
     if not HAS_CMEMS_CREDS:
-        print("DEBUG: COPERNICUS_USER/COPERNICUS_PASS not set -- live model "
-              "disabled (ocean-physics branch needs them)")
+        print("DEBUG: COPERNICUS_USER/COPERNICUS_PASS not set -- live model disabled")
         return None
 
     try:
@@ -232,8 +218,7 @@ def decode_b64_image(data_uri: str) -> Image.Image:
 
 
 def city_bbox(lat: float, lon: float, half_deg: float = 0.16):
-    """Small bbox around a city, in [S, N, W, E] order (matches
-    fetch_basin_mosaic's expected unpacking)."""
+    """Small bbox around a city, in [S, N, W, E] order."""
     import math
     lon_half = half_deg / max(0.15, math.cos(math.radians(lat)))
     return [lat - half_deg, lat + half_deg, lon - lon_half, lon + lon_half]
@@ -241,24 +226,6 @@ def city_bbox(lat: float, lon: float, half_deg: float = 0.16):
 
 @st.cache_data(show_spinner='🛰️ Fetching city imagery…')
 def city_base_image(entity_key: str) -> bytes | None:
-    """Lazily fetch + disk-cache a city's base satellite mosaic, the
-    same pattern basin_base_image() already uses for ocean basins.
-
-    This replaces reading pre-baked base64 out of timelapse_cache.json.
-    That approach doesn't scale: baking full-resolution JPEGs for every
-    city x year into one JSON file is what made timelapse_cache.json
-    tens of MB per ~20 cities (and would exceed GitHub's 100MB hard
-    file-size limit well before covering the world's coastlines).
-    Fetching on demand and caching only to local disk (which is
-    git-ignored, see .gitignore) means the repo only ever stores code
-    and small numeric prediction data, not images.
-
-    One base image per city is enough: nearby projection years don't
-    need visually distinct satellite photos (the flood *overlay* is
-    what changes by year, computed fresh by apply_inundation), and the
-    original cache's own 2015/2020/2025 entries were already
-    byte-for-byte identical for this exact reason.
-    """
     cache_file = CITY_CACHE_DIR / f'{entity_key.replace(" ", "_").replace("/", "-")}_base.jpg'
     if cache_file.exists() and cache_file.stat().st_size > 5000:
         return cache_file.read_bytes()
@@ -280,10 +247,6 @@ def city_base_image(entity_key: str) -> bytes | None:
 
 
 def city_image(entity_key: str, year: int):
-    """City base imagery. `year` is accepted for API compatibility with
-    the old interpolated-cache version, but is currently unused since a
-    single fetched mosaic is reused for all years (see city_base_image
-    docstring)."""
     raw = city_base_image(entity_key)
     if raw is None:
         return None
@@ -332,7 +295,7 @@ def basin_image(region_key: str, year: int, use_ee: bool = False):
         return None
     
     base = Image.open(io.BytesIO(raw)).convert('RGB')
-    st.success(f"✅ Base image loaded: {base.size[0]}×{base.size[1]} px")  # Visible feedback
+    st.success(f"✅ Base image loaded: {base.size[0]}×{base.size[1]} px")
     
     r = REGIONS[region_key]
     predicted_sla = get_prediction(region_key, year)
@@ -344,14 +307,12 @@ def basin_image(region_key: str, year: int, use_ee: bool = False):
 
 
 def city_image_flooded(entity_key: str, year: int):
-    """City image + smooth inundation overlay (fixes the boxy/inverted look)."""
     base = city_image(entity_key, year)
     if base is None or not HAS_BASIN:
         return base
     c = CITIES[entity_key]
     r = REGIONS[c['region']]
     
-    # Corrected: Fetch actual DL model predictions + calculate subsidence
     predicted_sla = get_prediction(entity_key, year)
     slr_mm = predicted_sla + c['subsidence_mm_yr'] * (year - 2025)
     delta = slr_mm - r['current_sla_mm']
