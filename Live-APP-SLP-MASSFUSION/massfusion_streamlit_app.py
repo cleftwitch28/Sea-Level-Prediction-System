@@ -112,10 +112,16 @@ def _init_earth_engine() -> bool:
             # Parse the string into a dictionary
             creds_dict = json.loads(ee_json_str)
             
-            # Generate credentials
-            credentials = Credentials.from_service_account_info(creds_dict)
+            # CRITICAL FIX: Define the explicit permissions (scopes) required
+            SCOPES = [
+                'https://www.googleapis.com/auth/earthengine',
+                'https://www.googleapis.com/auth/cloud-platform'
+            ]
             
-            # CRITICAL FIX: Pass the project ID explicitly
+            # Generate credentials AND attach the scopes
+            credentials = Credentials.from_service_account_info(creds_dict).with_scopes(SCOPES)
+            
+            # Pass the project ID explicitly
             project_id = creds_dict.get("project_id")
             ee.Initialize(credentials=credentials, project=project_id)
             return True
@@ -126,10 +132,9 @@ def _init_earth_engine() -> bool:
             return True
             
     except Exception as e:
-        # Show the actual error in the Streamlit UI so we can debug it
+        # Show the actual error in the Streamlit UI
         st.error(f"🌍 Earth Engine Authentication Error: {str(e)}")
-        return False
-HAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
+        return FalseHAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
 
 # DEBUG PRINTS
 print("DEBUG: DATA_DIR =", DATA_DIR)
