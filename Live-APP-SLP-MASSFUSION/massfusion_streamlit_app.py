@@ -99,30 +99,36 @@ CHECKPOINT_PATH = Path(os.environ.get('MASSFUSION_CHECKPOINT',
 def _init_earth_engine() -> bool:
     """Initializes Earth Engine using Streamlit Secrets or local auth."""
     if not HAS_EE_LIB:
+        st.error("Earth Engine library not installed.")
         return False
         
     try:
         from google.oauth2.service_account import Credentials
         
-        # 1. Check if the JSON string is in Streamlit secrets or environment
-        ee_json_str = os.environ.get('EE_SERVICE_ACCOUNT_JSON') or st.secrets.get('EE_SERVICE_ACCOUNT_JSON')
-        
-        if ee_json_str:
+        # 1. Look explicitly in Streamlit secrets first
+        if "EE_SERVICE_ACCOUNT_JSON" in st.secrets:
+            ee_json_str = st.secrets["EE_SERVICE_ACCOUNT_JSON"]
+            
             # Parse the string into a dictionary
             creds_dict = json.loads(ee_json_str)
-            # Generate credentials from the dictionary
+            
+            # Generate credentials
             credentials = Credentials.from_service_account_info(creds_dict)
-            ee.Initialize(credentials=credentials)
+            
+            # CRITICAL FIX: Pass the project ID explicitly
+            project_id = creds_dict.get("project_id")
+            ee.Initialize(credentials=credentials, project=project_id)
             return True
+            
         else:
             # Fallback for local dev if previously authenticated via CLI
             ee.Initialize()
             return True
             
     except Exception as e:
-        print(f"DEBUG: Earth Engine init failed: {e}")
+        # Show the actual error in the Streamlit UI so we can debug it
+        st.error(f"🌍 Earth Engine Authentication Error: {str(e)}")
         return False
-
 HAS_CMEMS_CREDS = bool(os.environ.get('COPERNICUS_USER')) and bool(os.environ.get('COPERNICUS_PASS'))
 
 # DEBUG PRINTS
