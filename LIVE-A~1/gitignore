@@ -1,0 +1,11 @@
+# MASSFusion — generated at runtime, never commit these:
+basin_imagery_cache/
+city_imagery_cache/
+
+# full pre-fetched cache backup (if you keep one locally) -- large, don't commit
+timelapse_cache.json.full_backup
+timelapse_cache.json.bak
+
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
