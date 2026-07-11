@@ -1,0 +1,16 @@
+streamlit
+streamlit-image-comparison
+pillow
+requests
+numpy
+scipy
+plotly
+google-auth
+# Live inference pipeline (only needed if you're turning on live model
+# inference -- the app runs fine without these, the toggle just stays
+# disabled and shows why)
+torch
+pandas
+xarray
+earthengine-api
+copernicusmarine
